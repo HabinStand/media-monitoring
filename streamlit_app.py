@@ -11,6 +11,7 @@ from urllib.parse import quote_plus
 import time
 import json
 from dateutil import parser as date_parser
+import re
 
 # Page configuration
 st.set_page_config(
@@ -24,11 +25,112 @@ if 'custom_keywords' not in st.session_state:
     st.session_state['custom_keywords'] = []
 
 
+def categorize_source(source_name):
+    """
+    Categorize news sources into different types
+    Returns: category name
+    """
+    source_lower = source_name.lower()
+    
+    # Mainstream Media
+    mainstream = [
+        'cnn', 'bbc', 'reuters', 'associated press', 'ap news', 'bloomberg',
+        'financial times', 'wall street journal', 'wsj', 'new york times', 'nyt',
+        'washington post', 'guardian', 'telegraph', 'fox news', 'nbc', 'abc',
+        'cbs', 'npr', 'pbs', 'usa today', 'time', 'newsweek', 'economist',
+        'forbes', 'fortune', 'business insider', 'cnbc', 'marketwatch', 'axios'
+    ]
+    
+    # Trade Press / Industry Publications
+    trade_press = [
+        'techcrunch', 'the verge', 'wired', 'ars technica', 'zdnet', 'cnet',
+        'venturebeat', 'recode', 'engadget', 'gizmodo', 'mashable', 'greentech',
+        'renewable energy world', 'energy storage news', 'utility dive', 'power',
+        'pv magazine', 'solar power world', 'wind power monthly', 'cleantechnica',
+        'electrek', 'green car reports', 'inside evs', 'automotive news',
+        'trade', 'industry week', 'manufacturing', 'chemical', 'engineering'
+    ]
+    
+    # Blogs and Independent Media
+    blogs = [
+        'medium', 'substack', 'blog', 'blogger', 'wordpress', 'tumblr',
+        'ghost', 'writefreely', 'newsletter', 'independent', 'personal site'
+    ]
+    
+    # Government and Academic
+    government_academic = [
+        '.gov', 'government', 'department of', 'ministry of', 'agency',
+        'university', 'college', 'institute', 'research', 'academic',
+        '.edu', 'journal', 'nature', 'science', 'pnas', 'arxiv'
+    ]
+    
+    # NGOs and Think Tanks
+    ngo_thinktank = [
+        'greenpeace', 'wwf', 'nrdc', 'sierra club', 'friends of the earth',
+        'brookings', 'cato', 'heritage', 'cfr', 'carnegie', 'rand',
+        'center for', 'institute for', 'foundation', 'council on'
+    ]
+    
+    # Local and Regional News
+    local_regional = [
+        'tribune', 'gazette', 'herald', 'times', 'post', 'news', 'daily',
+        'chronicle', 'journal', 'observer', 'examiner', 'courier', 'press',
+        'local', 'regional', 'community', 'county', 'city'
+    ]
+    
+    # Check each category
+    for term in mainstream:
+        if term in source_lower:
+            return "Mainstream Media"
+    
+    for term in trade_press:
+        if term in source_lower:
+            return "Trade Press"
+    
+    for term in government_academic:
+        if term in source_lower:
+            return "Government/Academic"
+    
+    for term in ngo_thinktank:
+        if term in source_lower:
+            return "NGO/Think Tank"
+    
+    for term in blogs:
+        if term in source_lower:
+            return "Blogs/Independent"
+    
+    for term in local_regional:
+        if term in source_lower:
+            return "Local/Regional"
+    
+    # Default category
+    return "Other"
+
+
+def parse_boolean_search(search_term):
+    """
+    Parse boolean search into Google News format
+    Supports: AND, OR, NOT operators
+    Examples:
+    - "climate AND policy" → "climate policy"
+    - "tesla OR spacex" → "tesla OR spacex"  
+    - "AI NOT crypto" → "AI -crypto"
+    """
+    # Replace NOT with - (Google's exclude operator)
+    search_term = search_term.replace(' NOT ', ' -')
+    # AND is implicit in Google, but we keep it for clarity
+    search_term = search_term.replace(' AND ', ' ')
+    # OR stays as is (Google supports OR)
+    return search_term
+
+
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_google_news_rss(keyword):
     """Fetch articles from Google News RSS for a specific keyword"""
     articles = []
-    url = f"https://news.google.com/rss/search?q={quote_plus(keyword)}&hl=en-US&gl=US&ceid=US:en"
+    # Parse boolean operators
+    parsed_keyword = parse_boolean_search(keyword)
+    url = f"https://news.google.com/rss/search?q={quote_plus(parsed_keyword)}&hl=en-US&gl=US&ceid=US:en"
     
     try:
         feed = feedparser.parse(url)
@@ -44,13 +146,16 @@ def fetch_google_news_rss(keyword):
             except:
                 pass
             
+            source_name = entry.get('source', {}).get('title', 'Unknown')
+            
             article = {
                 'Keyword': keyword,
                 'Title': entry.get('title', ''),
                 'URL': entry.get('link', ''),
                 'Published': published_str,
                 'Published_Date': published_date,
-                'Source': entry.get('source', {}).get('title', 'Unknown'),
+                'Source': source_name,
+                'Source_Category': categorize_source(source_name),
                 'Description': entry.get('summary', '')
             }
             articles.append(article)
@@ -83,14 +188,23 @@ def collect_all_feeds(progress_bar, status_text, keywords):
 def main():
     # Header
     st.title("📰 RSS Feed Collector")
-    st.markdown("Collect and analyze RSS feeds from Google News with custom keywords")
+    st.markdown("Collect and analyze RSS feeds from Google News with custom keywords and boolean search")
     
     # Sidebar
     st.sidebar.header("⚙️ Keyword Management")
     
     # Add new keyword
     with st.sidebar.expander("➕ Add New Keyword", expanded=False):
-        new_keyword = st.text_input("Enter keyword to monitor:", key="new_keyword_input")
+        st.markdown("""
+        **Boolean Search Operators:**
+        - `AND` - both terms must appear (e.g., `climate AND policy`)
+        - `OR` - either term can appear (e.g., `solar OR wind`)
+        - `NOT` - exclude term (e.g., `EV NOT Tesla`)
+        
+        You can combine operators: `(climate OR environment) AND policy NOT Trump`
+        """)
+        new_keyword = st.text_input("Enter keyword to monitor:", key="new_keyword_input", 
+                                    placeholder="e.g., climate AND policy")
         if st.button("Add Keyword"):
             if new_keyword and new_keyword.strip():
                 if new_keyword.strip() not in st.session_state['custom_keywords']:
@@ -131,15 +245,17 @@ def main():
     
     st.sidebar.header("ℹ️ About")
     st.sidebar.info("""
-    This app collects RSS feeds from Google News for your custom keywords.
+    This app collects RSS feeds from Google News for your custom keywords with boolean search support.
     
     **How to use:**
-    1. Add keywords in the sidebar
+    1. Add keywords (with boolean operators) in the sidebar
     2. Collect articles using your keywords
-    3. Filter and download results
+    3. Filter by source category and download results
     
-    **Getting Started:**
-    Click "➕ Add New Keyword" above to add your first keyword!
+    **Boolean Examples:**
+    - `Tesla AND production`
+    - `solar OR wind`
+    - `climate NOT politics`
     """)
     
     # Main content
@@ -172,10 +288,11 @@ def main():
             5. Come back here and click **"🚀 Collect Articles"**
             
             ### Example Keywords:
-            - Company names: "Tesla", "Microsoft"
-            - Topics: "artificial intelligence", "electric vehicles"
-            - People: "Elon Musk", "your competitor's CEO"
-            - Products: "ChatGPT", "iPhone 15"
+            - Simple: `Tesla`, `Microsoft`
+            - Boolean AND: `Tesla AND production`
+            - Boolean OR: `solar OR wind OR hydro`
+            - Boolean NOT: `climate NOT politics`
+            - Complex: `(EV OR electric vehicle) AND battery NOT Tesla`
             """)
         else:
             st.markdown("Click the button below to fetch the latest articles from Google News")
@@ -206,7 +323,7 @@ def main():
                     
                     # Display summary
                     st.subheader("📊 Summary")
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
                         st.metric("Total Articles", len(df))
@@ -214,15 +331,29 @@ def main():
                         st.metric("Keywords Searched", len(st.session_state['custom_keywords']))
                     with col3:
                         st.metric("Unique Sources", df['Source'].nunique())
+                    with col4:
+                        st.metric("Source Categories", df['Source_Category'].nunique())
                     
                     # Articles by keyword
                     st.subheader("Articles by Keyword")
                     keyword_counts = df['Keyword'].value_counts()
                     st.bar_chart(keyword_counts)
                     
+                    # Articles by source category
+                    st.subheader("Articles by Source Category")
+                    category_counts = df['Source_Category'].value_counts()
+                    st.bar_chart(category_counts)
+                    
+                    # Show breakdown of categories
+                    st.subheader("📂 Source Category Breakdown")
+                    for category in sorted(df['Source_Category'].unique()):
+                        with st.expander(f"{category} ({len(df[df['Source_Category'] == category])} articles)"):
+                            sources_in_category = df[df['Source_Category'] == category]['Source'].value_counts()
+                            st.write(sources_in_category)
+                    
                     # Display articles
                     st.subheader("📰 Recent Articles")
-                    display_df = df[['Title', 'Source', 'Keyword', 'Published', 'URL']].head(20)
+                    display_df = df[['Title', 'Source', 'Source_Category', 'Keyword', 'Published', 'URL']].head(20)
                     
                     # Make URLs clickable
                     st.dataframe(
@@ -359,9 +490,16 @@ def main():
                 default=df['Keyword'].unique().tolist()
             )
             
+            # Source category filter
+            selected_categories = st.multiselect(
+                "Filter by source category",
+                options=sorted(df['Source_Category'].unique().tolist()),
+                default=[]
+            )
+            
             # Source filter
             selected_sources = st.multiselect(
-                "Filter by source",
+                "Filter by specific source",
                 options=sorted(df['Source'].unique().tolist()),
                 default=[]
             )
@@ -394,6 +532,9 @@ def main():
             if selected_keywords:
                 filtered_df = filtered_df[filtered_df['Keyword'].isin(selected_keywords)]
             
+            if selected_categories:
+                filtered_df = filtered_df[filtered_df['Source_Category'].isin(selected_categories)]
+            
             if selected_sources:
                 filtered_df = filtered_df[filtered_df['Source'].isin(selected_sources)]
             
@@ -412,6 +553,8 @@ def main():
                 active_filters.append(f"✓ Text search: '{search_term}'")
             if len(selected_keywords) < len(df['Keyword'].unique()):
                 active_filters.append(f"Keywords: {len(selected_keywords)} selected")
+            if selected_categories:
+                active_filters.append(f"Categories: {', '.join(selected_categories)}")
             if selected_sources:
                 active_filters.append(f"Sources: {len(selected_sources)} selected")
             active_filters.append(f"Date range: {start_date} to {end_date}")
@@ -440,6 +583,8 @@ def main():
                         temp_df = temp_df[date_mask]
                     if selected_keywords:
                         temp_df = temp_df[temp_df['Keyword'].isin(selected_keywords)]
+                    if selected_categories:
+                        temp_df = temp_df[temp_df['Source_Category'].isin(selected_categories)]
                     if selected_sources:
                         temp_df = temp_df[temp_df['Source'].isin(selected_sources)]
                     
@@ -456,7 +601,17 @@ def main():
                     
                     st.info(f"💡 **Search Results:** Found '{search_term}' in {search_matches} article(s)")
                 
-                display_df = filtered_df[['Title', 'Source', 'Keyword', 'Published', 'URL']]
+                # Show category breakdown of results
+                st.subheader("📂 Results by Category")
+                category_counts = filtered_df['Source_Category'].value_counts()
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.bar_chart(category_counts)
+                with col2:
+                    st.dataframe(category_counts.reset_index().rename(columns={'index': 'Category', 'Source_Category': 'Count'}), 
+                               hide_index=True)
+                
+                display_df = filtered_df[['Title', 'Source', 'Source_Category', 'Keyword', 'Published', 'URL']]
                 
                 st.dataframe(
                     display_df,
@@ -501,9 +656,14 @@ def main():
         st.markdown("""
         ### Step-by-Step Instructions
         
-        #### 1. Manage Your Keywords
+        #### 1. Manage Your Keywords (with Boolean Search!)
         - In the **sidebar**, click **"➕ Add New Keyword"**
-        - Type your keyword and click **"Add Keyword"**
+        - Type your keyword with optional boolean operators:
+          - `climate AND policy` - both terms must appear
+          - `solar OR wind` - either term can appear
+          - `EV NOT Tesla` - exclude Tesla from EV results
+          - `(climate OR environment) AND policy` - combine operators
+        - Click **"Add Keyword"**
         - Remove keywords by clicking the 🗑️ button next to them
         - Use **"🗑️ Clear All Keywords"** to delete all keywords at once
         
@@ -512,36 +672,65 @@ def main():
         - Review the keywords that will be searched
         - Click the **"🚀 Collect Articles"** button
         - Wait 10-30 seconds while articles are fetched
-        - View the results and summary
+        - View the results and summary with source categorization
         
         #### 3. Download Your Data
         After collection, you can download the data in two formats:
-        - **CSV**: Open in Excel or Google Sheets
+        - **CSV**: Open in Excel or Google Sheets (includes Source_Category column)
         - **JSON**: For programming or further processing
         
         #### 4. Search & Filter
         - Go to the **"🔍 Search & Filter"** tab
         - Use the date range picker or quick filter buttons
         - Search for specific terms
-        - Filter by keyword or news source
+        - Filter by keyword, source category, or specific news source
         - Download filtered results
         
+        ### Source Categories Explained
+        
+        Articles are automatically categorized into:
+        
+        - **Mainstream Media**: CNN, BBC, Reuters, NYT, WSJ, etc.
+        - **Trade Press**: TechCrunch, Wired, CleanTechnica, industry publications
+        - **Blogs/Independent**: Medium, Substack, personal blogs
+        - **Government/Academic**: .gov sites, universities, research journals
+        - **NGO/Think Tank**: Greenpeace, Brookings, RAND, etc.
+        - **Local/Regional**: Local newspapers and regional news outlets
+        - **Other**: Sources that don't fit above categories
+        
+        ### Boolean Search Examples
+        
+        **Simple Boolean:**
+        - `Tesla AND production` - both words must appear
+        - `solar OR wind` - either word can appear
+        - `climate NOT politics` - exclude politics
+        
+        **Advanced Boolean:**
+        - `(EV OR "electric vehicle") AND battery` - parentheses for grouping
+        - `renewable energy NOT oil` - exclude specific topics
+        - `Microsoft AND (Azure OR cloud)` - multiple OR conditions
+        - `climate policy AND (EU OR Europe) NOT Brexit` - complex queries
+        
         ### Example Keywords You Can Add
-        - **Company names**: "Apple", "Google", "Tesla", "Microsoft"
-        - **Topics**: "climate change", "artificial intelligence", "cryptocurrency"
-        - **People**: "Elon Musk", "Tim Cook", industry leaders
-        - **Products**: "iPhone", "ChatGPT", "Tesla Model 3"
-        - **Regulations**: "EU AI Act", "GDPR", "carbon tax"
-        - **Technologies**: "quantum computing", "5G", "solar energy"
-        - **Events**: "COP28", "World Economic Forum", "Tech Summit"
+        
+        **Simple keywords:**
+        - "Apple", "Google", "Tesla", "Microsoft"
+        - "climate change", "artificial intelligence"
+        
+        **Boolean keywords:**
+        - "Tesla AND (production OR delivery)"
+        - "climate AND policy NOT Trump"
+        - "(solar OR wind) AND energy storage"
+        - "Microsoft AND AI NOT gaming"
+        - "EV OR electric vehicle OR battery electric"
         
         ### Tips for Better Results
-        - **Be specific**: "Tesla production delays" vs just "Tesla"
-        - **Use phrases**: Multi-word keywords work great
-        - **Combine terms**: "Microsoft AND acquisition"
-        - **Monitor competitors**: Add competitor names and products
-        - **Track trends**: Add emerging technology or policy terms
-        - **Industry terms**: Use jargon specific to your field
+        - **Use boolean AND** for precise results: "climate AND Africa"
+        - **Use boolean OR** for comprehensive coverage: "solar OR photovoltaic OR PV"
+        - **Use boolean NOT** to exclude: "Apple NOT iPhone" (just the company news)
+        - **Combine operators**: "(climate OR environment) AND policy AND (Africa OR Kenya)"
+        - **Filter by category** after collection to focus on specific source types
+        - **Track mainstream vs trade press** separately for different perspectives
         
         ### Data Freshness
         - Articles are fetched from Google News RSS feeds
@@ -551,11 +740,11 @@ def main():
         - Download your data regularly to build a historical database
         
         ### About This Tool
-        This RSS collector helps you monitor media coverage across any topics you choose.
+        This RSS collector helps you monitor media coverage with advanced search and categorization.
         Perfect for:
         - Media monitoring and PR tracking
         - Competitive intelligence
-        - Market research
+        - Market research across different source types
         - Industry trend analysis
         - Policy and regulatory tracking
         - ESG and sustainability reporting
@@ -564,45 +753,50 @@ def main():
         
         ### Frequently Asked Questions
         
+        **Q: How do boolean operators work?**  
+        A: They work like Google search. AND narrows results, OR expands them, NOT excludes terms.
+        
+        **Q: Can I see which sources are in each category?**  
+        A: Yes! After collection, expand the "Source Category Breakdown" section.
+        
         **Q: How many keywords can I add?**  
-        A: As many as you want! But more keywords = longer collection time (1-2 seconds per keyword).
+        A: As many as you want! More keywords = longer collection time (1-2 seconds per keyword).
         
         **Q: Are my keywords saved permanently?**  
-        A: No, keywords reset when you refresh the page. Keep a list of your keywords saved elsewhere.
+        A: No, keywords reset when you refresh the page. Keep a list saved elsewhere.
         
         **Q: Can I collect historical articles?**  
-        A: Google News RSS typically shows recent articles (last 24-48 hours). For history, collect regularly.
+        A: Google News RSS typically shows recent articles (last 24-48 hours). Collect regularly.
         
-        **Q: Why are some results not relevant?**  
-        A: RSS feeds use basic text matching. Use more specific keywords to improve results.
+        **Q: Why are some sources categorized as "Other"?**  
+        A: The categorization uses pattern matching. Uncommon sources may not match any category.
         
-        **Q: Can I schedule automatic collection?**  
-        A: Not in this version. Manually collect daily/weekly and build your database in Excel.
-        
-        **Q: What's the difference between CSV and JSON?**  
-        A: CSV opens in Excel/Sheets. JSON is better for programming and data processing.
+        **Q: Can I customize the source categories?**  
+        A: Not in the UI, but you can modify the `categorize_source()` function in the code.
         """)
         
         st.divider()
         
         st.subheader("🎯 Quick Start Example")
         st.markdown("""
-        **Scenario**: You want to monitor news about "electric vehicles" and "battery technology"
+        **Scenario**: You want to monitor mainstream media coverage of electric vehicles, excluding Tesla
         
-        1. **Add keywords**: 
+        1. **Add keyword with boolean**: 
            - Sidebar → "➕ Add New Keyword"
-           - Type "electric vehicles" → Add Keyword
-           - Type "battery technology" → Add Keyword
+           - Type: `(EV OR "electric vehicle") NOT Tesla`
+           - Add Keyword
         
         2. **Collect**: Click "🚀 Collect Articles"
         
-        3. **Filter**: Go to "Search & Filter" → Select "Last 7 days"
+        3. **Filter by category**: 
+           - Go to "Search & Filter"
+           - Select "Mainstream Media" in category filter
         
-        4. **Download**: Click "📄 Download CSV"
+        4. **Download**: Click "📄 Download Filtered Results (CSV)"
         
-        5. **Repeat**: Come back tomorrow and collect again to track trends
+        5. **Analyze**: Open in Excel and see what mainstream outlets are saying
         
-        That's it! You now have a database of recent news articles.
+        That's it! You now have targeted media coverage data.
         """)
 
 
