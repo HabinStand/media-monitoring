@@ -192,71 +192,71 @@ def main():
                 
                 progress_bar.empty()
                 status_text.empty()
-            
-            if df.empty:
-                st.warning("No articles found. Try again later.")
-            else:
-                # Store in session state
-                st.session_state['articles_df'] = df
-                st.session_state['collection_time'] = datetime.now()
-                st.session_state['keywords_used'] = st.session_state['custom_keywords'].copy()
                 
-                st.success(f"✅ Collection complete! Found {len(df)} unique articles")
-                
-                # Display summary
-                st.subheader("📊 Summary")
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("Total Articles", len(df))
-                with col2:
-                    st.metric("Keywords Searched", len(st.session_state['custom_keywords']))
-                with col3:
-                    st.metric("Unique Sources", df['Source'].nunique())
-                
-                # Articles by keyword
-                st.subheader("Articles by Keyword")
-                keyword_counts = df['Keyword'].value_counts()
-                st.bar_chart(keyword_counts)
-                
-                # Display articles
-                st.subheader("📰 Recent Articles")
-                display_df = df[['Title', 'Source', 'Keyword', 'Published', 'URL']].head(20)
-                
-                # Make URLs clickable
-                st.dataframe(
-                    display_df,
-                    column_config={
-                        "URL": st.column_config.LinkColumn("URL"),
-                        "Title": st.column_config.TextColumn("Title", width="large"),
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
-                
-                # Download buttons
-                st.subheader("💾 Download Data")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📄 Download CSV",
-                        data=csv,
-                        file_name=f"rss_feed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv",
+                if df.empty:
+                    st.warning("No articles found. Try again later.")
+                else:
+                    # Store in session state
+                    st.session_state['articles_df'] = df
+                    st.session_state['collection_time'] = datetime.now()
+                    st.session_state['keywords_used'] = st.session_state['custom_keywords'].copy()
+                    
+                    st.success(f"✅ Collection complete! Found {len(df)} unique articles")
+                    
+                    # Display summary
+                    st.subheader("📊 Summary")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Total Articles", len(df))
+                    with col2:
+                        st.metric("Keywords Searched", len(st.session_state['custom_keywords']))
+                    with col3:
+                        st.metric("Unique Sources", df['Source'].nunique())
+                    
+                    # Articles by keyword
+                    st.subheader("Articles by Keyword")
+                    keyword_counts = df['Keyword'].value_counts()
+                    st.bar_chart(keyword_counts)
+                    
+                    # Display articles
+                    st.subheader("📰 Recent Articles")
+                    display_df = df[['Title', 'Source', 'Keyword', 'Published', 'URL']].head(20)
+                    
+                    # Make URLs clickable
+                    st.dataframe(
+                        display_df,
+                        column_config={
+                            "URL": st.column_config.LinkColumn("URL"),
+                            "Title": st.column_config.TextColumn("Title", width="large"),
+                        },
+                        hide_index=True,
                         use_container_width=True
                     )
-                
-                with col2:
-                    json_str = df.to_json(orient='records', indent=2)
-                    st.download_button(
-                        label="📋 Download JSON",
-                        data=json_str,
-                        file_name=f"rss_feed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
+                    
+                    # Download buttons
+                    st.subheader("💾 Download Data")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        csv = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📄 Download CSV",
+                            data=csv,
+                            file_name=f"rss_feed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
+                    with col2:
+                        json_str = df.to_json(orient='records', indent=2)
+                        st.download_button(
+                            label="📋 Download JSON",
+                            data=json_str,
+                            file_name=f"rss_feed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json",
+                            use_container_width=True
+                        )
     
     with tab2:
         st.header("Search & Filter Collected Data")
