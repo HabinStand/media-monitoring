@@ -270,8 +270,17 @@ def main():
             
             st.text(f"Last collected: {collection_time.strftime('%Y-%m-%d %H:%M:%S')}")
             
+            # Show total articles
+            st.metric("Total Articles Collected", len(df))
+            
+            st.divider()
+            
             # Search
-            search_term = st.text_input("🔍 Search in titles and descriptions", "")
+            st.subheader("🔍 Text Search")
+            search_term = st.text_input("Search in titles and descriptions", "", placeholder="Type keywords to search...")
+            
+            if search_term:
+                st.info(f"Searching for: **{search_term}**")
             
             # Date filter
             st.subheader("📅 Date Filter")
@@ -346,6 +355,7 @@ def main():
             st.divider()
             
             # Keyword filter
+            st.subheader("🏷️ Filters")
             selected_keywords = st.multiselect(
                 "Filter by keyword",
                 options=df['Keyword'].unique().tolist(),
@@ -391,7 +401,21 @@ def main():
                 filtered_df = filtered_df[filtered_df['Source'].isin(selected_sources)]
             
             # Display results
-            st.subheader(f"Results: {len(filtered_df)} articles")
+            st.divider()
+            st.subheader(f"📊 Results: {len(filtered_df)} articles")
+            
+            # Show active filters
+            active_filters = []
+            if search_term:
+                active_filters.append(f"Text search: '{search_term}'")
+            if len(selected_keywords) < len(df['Keyword'].unique()):
+                active_filters.append(f"Keywords: {len(selected_keywords)} selected")
+            if selected_sources:
+                active_filters.append(f"Sources: {len(selected_sources)} selected")
+            active_filters.append(f"Date range: {start_date} to {end_date}")
+            
+            if active_filters:
+                st.caption("Active filters: " + " • ".join(active_filters))
             
             if len(filtered_df) > 0:
                 display_df = filtered_df[['Title', 'Source', 'Keyword', 'Published', 'URL']]
@@ -415,7 +439,14 @@ def main():
                     mime="text/csv"
                 )
             else:
-                st.warning("No articles match your filters")
+                st.warning("⚠️ No articles match your filters")
+                st.info("""
+                **Tips:**
+                - Try removing some filters
+                - Expand the date range
+                - Clear the search box
+                - Make sure keywords are selected
+                """)
     
     with tab3:
         st.header("📖 How to Use This App")
