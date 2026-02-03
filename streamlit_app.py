@@ -14,23 +14,16 @@ from dateutil import parser as date_parser
 
 # Page configuration
 st.set_page_config(
-    page_title="Carbon Measures RSS Collector",
+    page_title="RSS Feed Collector",
     page_icon="📰",
     layout="wide"
 )
 
 # Initialize session state for keywords
 if 'custom_keywords' not in st.session_state:
-    st.session_state['custom_keywords'] = [
-        "carbon measures",
-        "scope 3 emissions",
-        "exxon scope 3",
-        "greenhouse gas protocol scope 3",
-        "Amy Bracchio",
-        "Karthik Ramanna"
-    ]
+    st.session_state['custom_keywords'] = []
 
-# Default keywords (for reference)
+# Default keywords (kept for reference/reset option)
 DEFAULT_KEYWORDS = [
     "carbon measures",
     "scope 3 emissions",
@@ -99,8 +92,8 @@ def collect_all_feeds(progress_bar, status_text, keywords):
 
 def main():
     # Header
-    st.title("📰 Carbon Measures RSS Feed Collector")
-    st.markdown("Collect and analyze media coverage about Carbon Measures and related topics")
+    st.title("📰 RSS Feed Collector")
+    st.markdown("Collect and analyze RSS feeds from Google News with custom keywords")
     
     # Sidebar
     st.sidebar.header("⚙️ Keyword Management")
@@ -140,7 +133,7 @@ def main():
         st.rerun()
     
     # Reset to defaults
-    if st.sidebar.button("🔄 Reset to Default Keywords"):
+    if st.sidebar.button("🔄 Reset to Example Keywords"):
         st.session_state['custom_keywords'] = DEFAULT_KEYWORDS.copy()
         st.rerun()
     
@@ -151,9 +144,12 @@ def main():
     This app collects RSS feeds from Google News for your custom keywords.
     
     **How to use:**
-    1. Add or remove keywords in the sidebar
+    1. Add keywords in the sidebar
     2. Collect articles using your keywords
     3. Filter and download results
+    
+    **Getting Started:**
+    Click "➕ Add New Keyword" above to add your first keyword!
     """)
     
     # Main content
@@ -163,19 +159,34 @@ def main():
         st.header("📥 Collect RSS Feeds")
         
         # Show current keywords being monitored
-        st.subheader("Current Keywords")
-        st.write(f"Monitoring **{len(st.session_state['custom_keywords'])}** keywords:")
-        
-        # Display keywords in a nice format
-        keyword_cols = st.columns(3)
-        for i, keyword in enumerate(st.session_state['custom_keywords']):
-            with keyword_cols[i % 3]:
-                st.markdown(f"✓ {keyword}")
-        
-        st.divider()
+        if len(st.session_state['custom_keywords']) > 0:
+            st.subheader("Current Keywords")
+            st.write(f"Monitoring **{len(st.session_state['custom_keywords'])}** keywords:")
+            
+            # Display keywords in a nice format
+            keyword_cols = st.columns(3)
+            for i, keyword in enumerate(st.session_state['custom_keywords']):
+                with keyword_cols[i % 3]:
+                    st.markdown(f"✓ {keyword}")
+            
+            st.divider()
         
         if len(st.session_state['custom_keywords']) == 0:
-            st.warning("⚠️ No keywords configured. Please add keywords in the sidebar.")
+            st.info("👈 **Get Started:** Add your first keyword using the sidebar!")
+            st.markdown("""
+            ### How to Add Keywords:
+            1. Look at the **sidebar** on the left
+            2. Click **"➕ Add New Keyword"**
+            3. Type your keyword (e.g., "climate change", "renewable energy")
+            4. Click **"Add Keyword"**
+            5. Come back here and click **"🚀 Collect Articles"**
+            
+            ### Example Keywords:
+            - Company names: "Tesla", "Microsoft"
+            - Topics: "artificial intelligence", "electric vehicles"
+            - People: "Elon Musk", "your competitor's CEO"
+            - Products: "ChatGPT", "iPhone 15"
+            """)
         else:
             st.markdown("Click the button below to fetch the latest articles from Google News")
             
@@ -426,7 +437,7 @@ def main():
         - In the **sidebar**, click **"➕ Add New Keyword"**
         - Type your keyword and click **"Add Keyword"**
         - Remove keywords by clicking the 🗑️ button next to them
-        - Click **"🔄 Reset to Default Keywords"** to restore original keywords
+        - Use **"🔄 Reset to Example Keywords"** to load sample keywords
         
         #### 2. Collect Articles
         - Go to the **"📥 Collect Feeds"** tab
@@ -447,73 +458,83 @@ def main():
         - Filter by keyword or news source
         - Download filtered results
         
-        ### Default Keywords
-        The app comes pre-configured with these keywords:
-        1. "carbon measures"
-        2. "scope 3 emissions"
-        3. "exxon scope 3"
-        4. "greenhouse gas protocol scope 3"
-        5. "Amy Bracchio"
-        6. "Karthik Ramanna"
-        
         ### Example Keywords You Can Add
-        - Company names: "ExxonMobil", "BASF", "BlackRock"
-        - Topics: "carbon accounting", "net zero", "climate risk"
-        - People: Names of executives, researchers, policymakers
-        - Regulations: "CBAM", "SEC climate rules", "ISSB standards"
-        - Technologies: "carbon capture", "renewable energy"
+        - **Company names**: "Apple", "Google", "Tesla", "Microsoft"
+        - **Topics**: "climate change", "artificial intelligence", "cryptocurrency"
+        - **People**: "Elon Musk", "Tim Cook", industry leaders
+        - **Products**: "iPhone", "ChatGPT", "Tesla Model 3"
+        - **Regulations**: "EU AI Act", "GDPR", "carbon tax"
+        - **Technologies**: "quantum computing", "5G", "solar energy"
+        - **Events**: "COP28", "World Economic Forum", "Tech Summit"
         
-        ### Tips
-        - **Be specific**: "Tesla carbon footprint" vs just "Tesla"
-        - **Use quotes** (in your search): Exact phrase matching
-        - **Combine terms**: "carbon AND accounting" finds both words
-        - **Monitor competitors**: Add competitor company names
-        - **Track events**: Add conference names, policy initiatives
+        ### Tips for Better Results
+        - **Be specific**: "Tesla production delays" vs just "Tesla"
+        - **Use phrases**: Multi-word keywords work great
+        - **Combine terms**: "Microsoft AND acquisition"
+        - **Monitor competitors**: Add competitor names and products
+        - **Track trends**: Add emerging technology or policy terms
+        - **Industry terms**: Use jargon specific to your field
         
         ### Data Freshness
         - Articles are fetched from Google News RSS feeds
         - Data is cached for 1 hour to avoid excessive requests
         - Click "Collect Articles" again to refresh
         - Keywords are saved during your session only
+        - Download your data regularly to build a historical database
         
         ### About This Tool
         This RSS collector helps you monitor media coverage across any topics you choose.
-        It's perfect for:
+        Perfect for:
         - Media monitoring and PR tracking
         - Competitive intelligence
-        - Industry research
+        - Market research
+        - Industry trend analysis
         - Policy and regulatory tracking
         - ESG and sustainability reporting
+        - Academic research
+        - Investment research
         
         ### Frequently Asked Questions
         
         **Q: How many keywords can I add?**  
-        A: As many as you want, but more keywords = longer collection time (1-2 seconds per keyword).
+        A: As many as you want! But more keywords = longer collection time (1-2 seconds per keyword).
         
         **Q: Are my keywords saved permanently?**  
-        A: No, keywords reset when you refresh the page. Download your data regularly.
+        A: No, keywords reset when you refresh the page. Keep a list of your keywords saved elsewhere.
         
         **Q: Can I collect historical articles?**  
-        A: Google News RSS typically shows recent articles (last 24-48 hours).
+        A: Google News RSS typically shows recent articles (last 24-48 hours). For history, collect regularly.
         
         **Q: Why are some results not relevant?**  
         A: RSS feeds use basic text matching. Use more specific keywords to improve results.
         
         **Q: Can I schedule automatic collection?**  
-        A: Not in this version, but you can manually collect daily/weekly and build a database in Excel.
+        A: Not in this version. Manually collect daily/weekly and build your database in Excel.
+        
+        **Q: What's the difference between CSV and JSON?**  
+        A: CSV opens in Excel/Sheets. JSON is better for programming and data processing.
         """)
         
         st.divider()
         
         st.subheader("🎯 Quick Start Example")
         st.markdown("""
-        **Scenario**: You want to monitor "hydrogen fuel" and "carbon credits"
+        **Scenario**: You want to monitor news about "electric vehicles" and "battery technology"
         
-        1. **Add keywords**: Go to sidebar → Add "hydrogen fuel" → Add "carbon credits"
+        1. **Add keywords**: 
+           - Sidebar → "➕ Add New Keyword"
+           - Type "electric vehicles" → Add Keyword
+           - Type "battery technology" → Add Keyword
+        
         2. **Collect**: Click "🚀 Collect Articles"
+        
         3. **Filter**: Go to "Search & Filter" → Select "Last 7 days"
+        
         4. **Download**: Click "📄 Download CSV"
-        5. **Repeat**: Come back tomorrow and collect again
+        
+        5. **Repeat**: Come back tomorrow and collect again to track trends
+        
+        That's it! You now have a database of recent news articles.
         """)
 
 
