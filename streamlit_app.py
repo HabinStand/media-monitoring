@@ -23,16 +23,6 @@ st.set_page_config(
 if 'custom_keywords' not in st.session_state:
     st.session_state['custom_keywords'] = []
 
-# Default keywords (kept for reference/reset option)
-DEFAULT_KEYWORDS = [
-    "carbon measures",
-    "scope 3 emissions",
-    "exxon scope 3",
-    "greenhouse gas protocol scope 3",
-    "Amy Bracchio",
-    "Karthik Ramanna"
-]
-
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_google_news_rss(keyword):
@@ -132,9 +122,9 @@ def main():
             st.session_state['custom_keywords'].remove(keyword)
         st.rerun()
     
-    # Reset to defaults
-    if st.sidebar.button("🔄 Reset to Example Keywords"):
-        st.session_state['custom_keywords'] = DEFAULT_KEYWORDS.copy()
+    # Clear all keywords
+    if st.sidebar.button("🗑️ Clear All Keywords"):
+        st.session_state['custom_keywords'] = []
         st.rerun()
     
     st.sidebar.divider()
@@ -437,7 +427,7 @@ def main():
         - In the **sidebar**, click **"➕ Add New Keyword"**
         - Type your keyword and click **"Add Keyword"**
         - Remove keywords by clicking the 🗑️ button next to them
-        - Use **"🔄 Reset to Example Keywords"** to load sample keywords
+        - Use **"🗑️ Clear All Keywords"** to delete all keywords at once
         
         #### 2. Collect Articles
         - Go to the **"📥 Collect Feeds"** tab
