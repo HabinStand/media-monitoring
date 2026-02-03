@@ -279,9 +279,6 @@ def main():
             st.subheader("🔍 Text Search")
             search_term = st.text_input("Search in titles and descriptions", "", placeholder="Type keywords to search...")
             
-            if search_term:
-                st.info(f"Searching for: **{search_term}**")
-            
             # Date filter
             st.subheader("📅 Date Filter")
             col1, col2 = st.columns(2)
@@ -402,12 +399,17 @@ def main():
             
             # Display results
             st.divider()
+            
+            # Show search status prominently
+            if search_term:
+                st.success(f"🔍 **Search Active:** Showing results for '{search_term}'")
+            
             st.subheader(f"📊 Results: {len(filtered_df)} articles")
             
             # Show active filters
             active_filters = []
             if search_term:
-                active_filters.append(f"Text search: '{search_term}'")
+                active_filters.append(f"✓ Text search: '{search_term}'")
             if len(selected_keywords) < len(df['Keyword'].unique()):
                 active_filters.append(f"Keywords: {len(selected_keywords)} selected")
             if selected_sources:
@@ -418,6 +420,42 @@ def main():
                 st.caption("Active filters: " + " • ".join(active_filters))
             
             if len(filtered_df) > 0:
+                # Show search statistics if search is active
+                if search_term:
+                    search_matches = len(filtered_df)
+                    total_before_search = len(df)
+                    
+                    # Apply all filters except search to see search impact
+                    temp_df = df.copy()
+                    if 'Published_Date' in temp_df.columns:
+                        start_datetime = pd.Timestamp(start_date)
+                        end_datetime = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                        date_mask = temp_df['Published_Date'].isna()
+                        if temp_df['Published_Date'].notna().any():
+                            temp_df['Published_Date_Compare'] = pd.to_datetime(temp_df['Published_Date']).dt.tz_localize(None)
+                            date_mask = date_mask | (
+                                (temp_df['Published_Date_Compare'] >= start_datetime) & 
+                                (temp_df['Published_Date_Compare'] <= end_datetime)
+                            )
+                        temp_df = temp_df[date_mask]
+                    if selected_keywords:
+                        temp_df = temp_df[temp_df['Keyword'].isin(selected_keywords)]
+                    if selected_sources:
+                        temp_df = temp_df[temp_df['Source'].isin(selected_sources)]
+                    
+                    articles_before_search = len(temp_df)
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Articles Before Search", articles_before_search)
+                    with col2:
+                        st.metric("Matching Search Term", search_matches)
+                    with col3:
+                        match_rate = (search_matches / articles_before_search * 100) if articles_before_search > 0 else 0
+                        st.metric("Match Rate", f"{match_rate:.1f}%")
+                    
+                    st.info(f"💡 **Search Results:** Found '{search_term}' in {search_matches} article(s)")
+                
                 display_df = filtered_df[['Title', 'Source', 'Keyword', 'Published', 'URL']]
                 
                 st.dataframe(
@@ -439,14 +477,23 @@ def main():
                     mime="text/csv"
                 )
             else:
-                st.warning("⚠️ No articles match your filters")
-                st.info("""
-                **Tips:**
-                - Try removing some filters
-                - Expand the date range
-                - Clear the search box
-                - Make sure keywords are selected
-                """)
+                if search_term:
+                    st.error(f"❌ **No Results Found for '{search_term}'**")
+                    st.warning("""
+                    Your search term didn't match any articles. Try:
+                    - Using different keywords
+                    - Checking for typos
+                    - Using partial words (e.g., "climat" instead of "climate change")
+                    - Removing other filters to expand results
+                    """)
+                else:
+                    st.warning("⚠️ No articles match your filters")
+                    st.info("""
+                    **Tips:**
+                    - Try removing some filters
+                    - Expand the date range
+                    - Make sure keywords are selected
+                    """)
     
     with tab3:
         st.header("📖 How to Use This App")
